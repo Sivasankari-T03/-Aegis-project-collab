@@ -1,0 +1,1729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AEGIS — Conversational AI with 3D Motion</title>
+  <link rel="icon" href="data:,">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { height: 100%; }
+    body {
+      background: radial-gradient(1200px 600px at 75% -10%, rgba(56,189,248,0.10), transparent 60%),
+                  radial-gradient(1000px 500px at 10% 110%, rgba(45, 212, 191, 0.08), transparent 60%),
+                  #020617;
+    }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 8px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    .glass {
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .glow-blue  { box-shadow: 0 0 24px rgba(56,189,248,0.18), inset 0 0 24px rgba(56,189,248,0.04); }
+    .glow-teal  { box-shadow: 0 0 24px rgba(45,212,191,0.18), inset 0 0 24px rgba(45,212,191,0.04); }
+    .grid-fade {
+      background-image: linear-gradient(to right, rgba(51,65,85,0.16) 1px, transparent 1px),
+                        linear-gradient(to bottom, rgba(51,65,85,0.16) 1px, transparent 1px);
+      background-size: 24px 24px;
+      mask-image: radial-gradient(ellipse at center, black 40%, transparent 78%);
+      -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 78%);
+    }
+    .pulse-dot { animation: pulseDot 1.6s ease-in-out infinite; }
+    @keyframes pulseDot {
+      0%,100% { box-shadow: 0 0 0 0 rgba(52,211,153,0.6); }
+      50%     { box-shadow: 0 0 0 6px rgba(52,211,153,0); }
+    }
+    .typewriter-caret::after { content: "▍"; color: #38bdf8; animation: blink 0.9s steps(2, start) infinite; }
+    @keyframes blink { to { visibility: hidden; } }
+    .preset-btn {
+      font-size: 10px; padding: 3px 9px; border-radius: 999px;
+      border: 1px solid rgba(45,212,191,0.35); color: #5eead4;
+      background: rgba(45,212,191,0.06); transition: all .2s ease;
+    }
+    .preset-btn:hover { background: rgba(45,212,191,0.16); border-color: rgba(45,212,191,0.7); color: #ccfbf1; }
+    .step-item { display: flex; gap: 8px; padding: 6px 8px; border-radius: 8px; border: 1px solid transparent; transition: all .25s ease; }
+    .step-num { flex: none; width: 18px; height: 18px; border-radius: 50%; background: #1e3a5f; color: #7dd3fc; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+    .step-name { display: block; color: #cbd5e1; font-size: 11px; font-weight: 600; }
+    .step-detail { margin: 0; color: #64748b; font-size: 10px; line-height: 1.45; }
+    .step-item.step-active { border-color: rgba(56,189,248,0.5); background: rgba(56,189,248,0.08); }
+    .step-item.step-active .step-num { background: #0ea5e9; color: #02121f; }
+    .step-item.step-active .step-name { color: #7dd3fc; }
+    .fade-up { animation: fadeUp 0.45s ease both; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .code-scroll::-webkit-scrollbar { height: 6px; }
+  </style>
+</head>
+<body class="text-slate-100 font-sans min-h-screen flex flex-col">
+
+  <!-- ═══════════ HEADER ═══════════ -->
+  <header class="sticky top-0 z-40 glass border-b border-slate-800/80 px-4 py-3">
+    <div class="max-w-7xl mx-auto flex justify-between items-center gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500/30 to-teal-400/30 border border-blue-400/40 flex items-center justify-center text-lg font-black text-blue-300 glow-blue">
+          ⬡
+        </div>
+        <div>
+          <h1 class="text-lg font-bold leading-tight bg-gradient-to-r from-blue-400 via-cyan-300 to-teal-400 bg-clip-text text-transparent">
+            AEGIS Conversational Engine
+          </h1>
+          <p class="text-[10px] text-slate-500 font-mono -mt-0.5">neural · spatial · reactive</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="status-pill" class="flex items-center gap-2 text-[11px] font-mono px-3 py-1.5 rounded-full border border-slate-700/70 bg-slate-900/70 text-slate-300">
+          <span id="status-dot" class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span>
+          <span id="status-text">System Ready</span>
+        </span>
+        <button id="demo-btn" class="text-[11px] font-semibold px-3 py-1.5 rounded-full bg-gradient-to-r from-blue-600 to-teal-500 hover:from-blue-500 hover:to-teal-400 text-white transition shadow-lg shadow-blue-900/40">
+          ⚡ Live Demo
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════ MAIN ═══════════ -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+    <!-- ─────── LEFT COLUMN ─────── -->
+    <section class="lg:col-span-1 space-y-4">
+
+      <!-- API Key card -->
+      <div class="glass border border-slate-700/60 rounded-xl p-4 glow-blue fade-up">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Gemini API Key</label>
+          <button id="toggle-key" class="text-[10px] text-slate-500 hover:text-slate-300 font-mono">show</button>
+        </div>
+        <input id="api-key-input" type="password" placeholder="Paste AI Studio Key (AIzaSy...)" autocomplete="off"
+          class="w-full bg-slate-950/80 border border-slate-700 rounded-lg py-2 px-3 text-xs font-mono focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-slate-100 transition">
+        <p class="text-[10px] text-slate-500 mt-1.5">Key stays in your browser. No key? Press <span class="text-teal-400 font-semibold">⚡ Live Demo</span>.</p>
+      </div>
+
+      <!-- Query card -->
+      <div class="glass border border-slate-700/60 rounded-xl p-4 glow-teal fade-up">
+        <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Ask Anything</label>
+        <div class="relative flex items-center">
+          <input id="query-input" type="text" placeholder="Ask a question or request a demo..."
+            class="w-full bg-slate-950/80 border border-slate-700 rounded-lg py-2 pl-3 pr-10 text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 text-slate-100 transition">
+          <button id="mic-btn" title="Voice input" class="absolute right-2.5 text-lg text-slate-400 hover:text-teal-300 transition">
+            🎙
+          </button>
+        </div>
+        <div class="flex gap-2 mt-3">
+          <button id="analyze-btn" class="flex-1 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-cyan-400 text-white font-semibold py-2 rounded-lg text-sm transition shadow-lg shadow-blue-900/40 disabled:opacity-50 disabled:cursor-wait">
+            Ask AI Engine
+          </button>
+          <button id="demo-btn-2" title="Run built-in demo (no API key)" class="px-3 rounded-lg border border-teal-500/50 text-teal-300 hover:bg-teal-500/10 text-lg transition">⚡</button>
+        </div>
+        <div class="flex gap-1.5 mt-2 flex-wrap">
+          <button data-preset="pacman maze: a ghost chases pac-man and predicts its next move, explain the chase algorithm" class="preset-btn">🍒 Pac-Man</button>
+          <button data-preset="sudoku backtracking solver scanning the 9x9 grid" class="preset-btn">🧩 Sudoku</button>
+          <button data-preset="spiral matrix traversal" class="preset-btn">🌀 Spiral</button>
+        </div>
+      </div>
+
+      <!-- Response card -->
+      <div class="glass border border-slate-700/60 rounded-xl p-4 fade-up">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">AI Response</h2>
+          <span id="engine-chip" class="text-[10px] font-mono px-2 py-0.5 rounded border border-slate-700 text-slate-500">status: idle</span>
+        </div>
+        <div id="analysis-summary" class="text-sm text-slate-300 space-y-3 min-h-[120px]">
+          <p class="text-slate-500 italic text-xs">Ask a question above — the 3D agent will fly a path that visualizes the algorithm's behavior.</p>
+        </div>
+
+        <!-- Ghost chase card (Pac-Man style queries) -->
+        <div id="ghost-block" class="mt-3 hidden border border-red-500/30 rounded-lg overflow-hidden">
+          <div class="bg-red-950/60 px-2 py-1 text-[9px] uppercase tracking-widest text-red-300 font-bold">👻 Ghost Prediction &amp; Chase Algorithm</div>
+          <div class="p-2 text-[11px] text-slate-300 space-y-1">
+            <p><span class="text-red-300 font-semibold">Algorithm:</span> <span id="ghost-algo" class="text-slate-200">—</span></p>
+            <p><span class="text-red-300 font-semibold">Predicted next cell:</span> <span id="ghost-next" class="font-mono text-amber-300">—</span></p>
+            <p><span class="text-red-300 font-semibold">Why this move:</span> <span id="ghost-why" class="text-slate-400 block mt-0.5">—</span></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────── RIGHT COLUMN ─────── -->
+    <section class="lg:col-span-2 space-y-4">
+
+      <!-- 3D Canvas -->
+      <div id="stage" class="relative bg-slate-950 border border-slate-800 rounded-xl h-[420px] overflow-hidden glow-blue fade-up">
+        <div class="grid-fade absolute inset-0 pointer-events-none"></div>
+        <div id="canvas-container" class="absolute inset-0"></div>
+
+        <!-- HUD top-left -->
+        <div class="absolute top-3 left-3 z-10 bg-slate-900/80 backdrop-blur px-2.5 py-1 rounded border border-slate-800 text-[10px] font-mono text-slate-400 flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+          Dynamic 3D Agent Demonstrator
+        </div>
+
+        <!-- HUD top-right -->
+        <div class="absolute top-3 right-3 z-10 flex flex-col items-end gap-1.5">
+          <div class="flex gap-1.5">
+            <button id="reset-cam" title="Reset camera" class="bg-slate-900/80 hover:bg-slate-700/80 border border-slate-700 rounded px-2 py-1 text-[10px] font-mono text-slate-300 transition">⌂ Reset</button>
+            <button id="toggle-cam" title="Toggle auto-rotate" class="bg-slate-900/80 hover:bg-slate-700/80 border border-slate-700 rounded px-2 py-1 text-[10px] font-mono text-slate-300 transition">⟳ Orbit</button>
+            <button id="follow-cam" title="Chase-cam: camera rides behind the agent" class="bg-slate-900/80 hover:bg-slate-700/80 border border-slate-700 rounded px-2 py-1 text-[10px] font-mono text-slate-300 transition">🎥 Follow</button>
+          </div>
+          <div class="flex items-center gap-1.5 bg-slate-900/80 border border-slate-700 rounded px-2 py-1">
+            <span class="text-[9px] font-mono text-slate-400">⏩</span>
+            <input id="speed-slider" type="range" min="0.25" max="3" step="0.05" value="1" class="w-24 accent-teal-400 cursor-pointer">
+            <span id="speed-val" class="text-[9px] font-mono text-teal-300 w-8 text-right">1.0×</span>
+          </div>
+        </div>
+
+        <!-- Hover tooltip: why the agent chose each waypoint -->
+        <div id="wp-info" class="absolute bottom-16 left-1/2 -translate-x-1/2 z-10 opacity-0 transition-opacity duration-200 pointer-events-none bg-slate-900/90 border border-teal-500/40 rounded-lg px-3 py-1.5 text-[10px] font-mono text-teal-200 max-w-[94%] text-center">
+          Hover a numbered waypoint to see why the agent chose that next move.
+        </div>
+
+        <!-- HUD top-center: always-visible algorithm label -->
+        <div id="stage-algo" class="absolute top-3 left-1/2 -translate-x-1/2 z-10 opacity-0 transition-all duration-500 pointer-events-none bg-slate-900/80 backdrop-blur border border-teal-500/40 rounded-full px-3 py-1 text-[10px] font-mono text-teal-300 flex items-center gap-2 whitespace-nowrap max-w-[80%]">
+          <span class="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse shrink-0"></span>
+          <span id="stage-algo-text" class="truncate">Algorithm: —</span>
+        </div>
+
+        <!-- HUD bottom: active algorithm banner -->
+        <div id="algo-banner" class="absolute bottom-3 left-3 right-3 z-10 pointer-events-none opacity-0 transition-all duration-500 translate-y-2">
+          <div class="bg-slate-900/85 backdrop-blur border border-blue-500/40 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <span class="text-[9px] uppercase tracking-widest text-blue-400 font-bold block">Active Animation Algorithm</span>
+              <span id="algo-name" class="text-sm font-semibold text-teal-300 block truncate">—</span>
+              <span id="step-line" class="text-[10px] text-slate-400 block truncate">—</span>
+              <span id="ghost-line" class="text-[10px] text-red-300/90 block truncate">—</span>
+            </div>
+            <span id="travel-pct" class="text-[11px] font-mono text-slate-400 shrink-0">0%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Engine Log / Code Context -->
+      <div class="glass border border-slate-800 rounded-xl p-4 fade-up">
+        <div class="flex justify-between items-center mb-2">
+          <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Engine Log / Code Context</span>
+          <button id="clear-log" class="text-[10px] font-mono text-slate-500 hover:text-slate-300 border border-slate-700 rounded px-2 py-0.5 transition">clear</button>
+        </div>
+        <pre class="bg-slate-950/90 p-3 rounded-lg overflow-x-auto text-xs font-mono text-cyan-300 border border-slate-800/80 h-44 overflow-y-auto code-scroll"><code id="code-view"><span class="text-slate-500">// AEGIS engine online. Awaiting instructions...</span></code></pre>
+      </div>
+    </section>
+  </main>
+
+  <footer class="text-center text-[10px] text-slate-600 font-mono py-4 border-t border-slate-800/60">
+    AEGIS v2.0 · Three.js r128 · Gemini API · drag to orbit · scroll to zoom · hover numbered waypoints for the "why" · 🎥 follow-cam · ⏩ speed
+  </footer>
+
+  <script>
+    /* ══════════════════════════════════════════════════════════════════════
+       0. ESCAPING + DOM HELPERS
+    ══════════════════════════════════════════════════════════════════════ */
+    function esc(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function log(msg, color = '#7dd3fc') {
+      const el = document.getElementById('code-view');
+      const t = new Date().toLocaleTimeString('en-GB');
+      const line = document.createElement('div');
+      line.innerHTML = `<span style="color:#475569">▸ ${t}</span> <span style="color:${color}">${esc(msg)}</span>`;
+      el.appendChild(line);
+      el.parentElement.scrollTop = el.parentElement.scrollHeight;
+    }
+    function setStatus(text, kind = 'ok') {
+      const dot = document.getElementById('status-dot');
+      const pill = document.getElementById('status-pill');
+      document.getElementById('status-text').textContent = text;
+      dot.className = 'w-2 h-2 rounded-full pulse-dot ' +
+        (kind === 'busy' ? 'bg-amber-400' : kind === 'err' ? 'bg-red-400' : 'bg-emerald-400');
+      pill.className = 'flex items-center gap-2 text-[11px] font-mono px-3 py-1.5 rounded-full border ' +
+        (kind === 'busy' ? 'border-amber-500/40 bg-slate-900/70 text-amber-300'
+          : kind === 'err' ? 'border-red-500/40 bg-slate-900/70 text-red-300'
+          : 'border-emerald-500/30 bg-slate-900/70 text-slate-300');
+    }
+    function setChip(text) {
+      document.getElementById('engine-chip').textContent = 'status: ' + text;
+    }
+    function showBanner(name) {
+      document.getElementById('algo-name').textContent = name || 'Custom Trajectory Path';
+      const b = document.getElementById('algo-banner');
+      b.classList.remove('opacity-0', 'translate-y-2');
+    }
+    function hideBanner() {
+      document.getElementById('algo-banner').classList.add('opacity-0', 'translate-y-2');
+    }
+    function typeInto(el, text, speed = 8) {
+      el.innerHTML = '';
+      let i = 0;
+      el.classList.add('typewriter-caret');
+      (function step() {
+        if (i <= text.length) {
+          el.textContent = text.slice(0, i);
+          i++;
+          setTimeout(step, speed);
+        } else {
+          el.classList.remove('typewriter-caret');
+        }
+      })();
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       1. THREE.JS — GLOBALS & SCENE BUILD
+    ══════════════════════════════════════════════════════════════════════ */
+    let scene, camera, renderer, controls;
+    let agentGroup, outerRing, innerRing, coreMesh, satellites = [];
+    let trailLine, starLayerA, starLayerB;
+    let targetMarker, beamMesh;
+    let splineCurve = null;
+    let animationProgress = 0;
+    let isAnimating = false;
+    let isFlying = false;          // true while travelling the spline
+    let lastTangent = new THREE.Vector3();
+    const trail = [];
+    const MAX_TRAIL = 72;
+    const ripples = [];
+    const pellets = [];      // pacman-style collectibles
+    const gridHints = [];    // grid cell markers
+    let decoGroup = null;    // topic-aware scene decorations
+    let eatenCount = 0;
+    let pelletsDone = false;
+    let steps = [];        // step-by-step breakdown (synced to flight)
+    let lastStep = -1;
+    let stepItems = [];
+    // Ghost chase (Pac-Man style)
+    let ghostGroup = null, ghostNextMarker = null, ghostArrow = null;
+    let ghostSpline = null, ghostWaypoints = [];
+    let ghostProgress = 0, ghostActive = false, ghostSpeed = 0.78;
+
+    /* ── Interactive path-visualization helpers (visualization only) ── */
+    const raycaster = new THREE.Raycaster();
+    const mouseNDC = new THREE.Vector2();
+    const camAnchor = new THREE.Vector3(10, 11, 15);
+    const STEP_COLORS = [0x38bdf8, 0x22d3ee, 0x34d399, 0xfacc15, 0xfb923c, 0xf87171, 0xe879f9, 0x818cf8];
+    let wpMarkers = [], wpPillars = [];   // numbered decision beacons + their pillars (raycast targets)
+    let phaseRibbon = null;               // ground path ribbon colored by algorithm phase
+    let activeWp = -1;
+    let prevTangentValid = false;
+    let speedMul = 1;                     // user flight-speed multiplier
+    let followMode = false;               // cinematic chase-camera mode
+
+    function init3D() {
+      const container = document.getElementById('canvas-container');
+      const W = container.clientWidth, H = container.clientHeight;
+
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x020617);
+      scene.fog = new THREE.FogExp2(0x020617, 0.022);
+
+      camera = new THREE.PerspectiveCamera(48, W / H, 0.1, 1000);
+      camera.position.set(10, 11, 15);
+      camera.lookAt(0, 1, 0);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(W, H);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = false;
+      container.appendChild(renderer.domElement);
+
+      /* ── Lighting ── */
+      scene.add(new THREE.AmbientLight(0x24344d, 1.6));
+
+      const key = new THREE.SpotLight(0x38bdf8, 3.2);
+      key.position.set(0, 22, 12);
+      key.angle = Math.PI / 4.5;
+      key.penumbra = 0.9;
+      scene.add(key);
+
+      const rim = new THREE.PointLight(0x2dd4bf, 2.2, 40);
+      rim.position.set(-10, -4, -8);
+      scene.add(rim);
+
+      const fill = new THREE.PointLight(0x6366f1, 1.6, 40);
+      fill.position.set(8, 6, -10);
+      scene.add(fill);
+
+      /* ── Ground grid ── */
+      const grid = new THREE.GridHelper(30, 30, 0x0ea5e9, 0x1e293b);
+      grid.position.y = -0.01;
+      scene.add(grid);
+      const grid2 = new THREE.GridHelper(30, 30, 0x0ea5e9, 0x1e293b);
+      grid2.position.y = -0.02;
+      grid2.rotation.x = Math.PI; // subtle visual depth layer
+      grid2.position.y = -0.02;
+      scene.add(grid2);
+
+      /* ── Star fields (two counter-rotating layers) ── */
+      function buildStars(count, size, color, opacity) {
+        const geo = new THREE.BufferGeometry();
+        const arr = new Float32Array(count * 3);
+        for (let i = 0; i < count; i++) {
+          arr[i*3]   = (Math.random() - 0.5) * 160;
+          arr[i*3+1] = (Math.random() - 0.5) * 90;
+          arr[i*3+2] = (Math.random() - 0.5) * 160;
+        }
+        geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+        const mat = new THREE.PointsMaterial({
+          color, size, transparent: true, opacity, sizeAttenuation: false,
+          blending: THREE.AdditiveBlending, depthWrite: false
+        });
+        const pts = new THREE.Points(geo, mat);
+        scene.add(pts);
+        return { mesh: pts, mat };
+      }
+      starLayerA = buildStars(450, 0.9, 0x7dd3fc, 0.85);
+      starLayerB = buildStars(320, 0.6, 0x94a3b8, 0.55);
+
+      /* ── Agent group ── */
+      agentGroup = new THREE.Group();
+
+      // Glowing glass core
+      const coreGeo = new THREE.IcosahedronGeometry(0.5, 3);
+      const coreMat = new THREE.MeshPhysicalMaterial({
+        color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.9,
+        roughness: 0.12, metalness: 0.15, clearcoat: 1.0, clearcoatRoughness: 0.1
+      });
+      coreMesh = new THREE.Mesh(coreGeo, coreMat);
+
+      // Inner spark (small bright icosahedron inside)
+      const sparkGeo = new THREE.IcosahedronGeometry(0.18, 2);
+      const sparkMat = new THREE.MeshBasicMaterial({ color: 0xe0f2fe });
+      const spark = new THREE.Mesh(sparkGeo, sparkMat);
+      coreMesh.add(spark);
+
+      // Gyro rings
+      const ringMat1 = new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.85, roughness: 0.2 });
+      const ringMat2 = new THREE.MeshStandardMaterial({ color: 0x2dd4bf, metalness: 0.9, roughness: 0.12 });
+      outerRing = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.03, 16, 100), ringMat1);
+      innerRing = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.022, 16, 100), ringMat2);
+
+      agentGroup.add(coreMesh, outerRing, innerRing);
+
+      // Orbiting satellites
+      for (let i = 0; i < 3; i++) {
+        const orb = new THREE.Mesh(
+          new THREE.SphereGeometry(0.06, 12, 12),
+          new THREE.MeshBasicMaterial({ color: i === 0 ? 0x2dd4bf : 0x7dd3fc })
+        );
+        orb.userData = { radius: 1.25 + i * 0.22, speed: 1.6 - i * 0.35, phase: (i * Math.PI * 2) / 3, plane: i };
+        satellites.push(orb);
+        agentGroup.add(orb);
+      }
+
+      agentGroup.position.set(0, 1, 0);
+      scene.add(agentGroup);
+
+      /* ── Motion trail (smooth line, rainbow-gradient comet) ── */
+      const trailGeo = new THREE.BufferGeometry();
+      const trailArr = new Float32Array(MAX_TRAIL * 3);
+      const trailCol = new Float32Array(MAX_TRAIL * 3);
+      trailGeo.setAttribute('position', new THREE.BufferAttribute(trailArr, 3));
+      trailGeo.setAttribute('color', new THREE.BufferAttribute(trailCol, 3));
+      const trailMat = new THREE.LineBasicMaterial({
+        vertexColors: true, transparent: true, opacity: 0.92, blending: THREE.AdditiveBlending
+      });
+      trailLine = new THREE.Line(trailGeo, trailMat);
+      trailLine.frustumCulled = false;
+      scene.add(trailLine);
+
+      /* ── Target marker: pulsing ring + light beam ── */
+      targetMarker = new THREE.Mesh(
+        new THREE.RingGeometry(0.32, 0.5, 48),
+        new THREE.MeshBasicMaterial({ color: 0x2dd4bf, side: THREE.DoubleSide, transparent: true, opacity: 0 })
+      );
+      targetMarker.rotation.x = -Math.PI / 2;
+      scene.add(targetMarker);
+
+      beamMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.05, 0.16, 2.4, 12, 1, true),
+        new THREE.MeshBasicMaterial({ color: 0x2dd4bf, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
+      );
+      beamMesh.position.y = 1.2;
+      scene.add(beamMesh);
+
+      /* ── Topic-aware decorations group ── */
+      decoGroup = new THREE.Group();
+      scene.add(decoGroup);
+
+      /* ── Ghost chaser (Pac-Man style) ── */
+      ghostGroup = new THREE.Group();
+      const ghostBody = new THREE.Mesh(
+        new THREE.SphereGeometry(0.42, 24, 24),
+        new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0x7f1d1d, emissiveIntensity: 0.8, roughness: 0.35 })
+      );
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const pupMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+      const eyeGeo = new THREE.SphereGeometry(0.1, 12, 12);
+      const pupGeo = new THREE.SphereGeometry(0.05, 10, 10);
+      const e1 = new THREE.Mesh(eyeGeo, eyeMat); e1.position.set(-0.16, 0.14, 0.38);
+      const e2 = new THREE.Mesh(eyeGeo, eyeMat); e2.position.set(0.16, 0.14, 0.38);
+      const p1 = new THREE.Mesh(pupGeo, pupMat); p1.position.set(-0.16, 0.14, 0.5);
+      const p2 = new THREE.Mesh(pupGeo, pupMat); p2.position.set(0.16, 0.14, 0.5);
+      ghostGroup.add(ghostBody, e1, e2, p1, p2);
+      ghostGroup.visible = false;
+      scene.add(ghostGroup);
+
+      // Ghost "next cell" prediction marker (pulsing ring + beam)
+      ghostNextMarker = new THREE.Mesh(
+        new THREE.RingGeometry(0.34, 0.5, 40),
+        new THREE.MeshBasicMaterial({ color: 0xf87171, side: THREE.DoubleSide, transparent: true, opacity: 0 })
+      );
+      ghostNextMarker.rotation.x = -Math.PI / 2;
+      ghostNextMarker.visible = false;
+      scene.add(ghostNextMarker);
+
+      // Arrow from ghost to its predicted next cell
+      const ghostArrGeo = new THREE.BufferGeometry();
+      ghostArrGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+      ghostArrow = new THREE.Line(
+        ghostArrGeo,
+        new THREE.LineBasicMaterial({ color: 0xf87171, transparent: true, opacity: 0.7 })
+      );
+      ghostArrow.visible = false;
+      scene.add(ghostArrow);
+
+      /* ── Controls ── */
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.06;
+      controls.minDistance = 4;
+      controls.maxDistance = 40;
+      controls.maxPolarAngle = Math.PI / 2.05;
+      controls.target.set(0, 1, 0);
+      controls.autoRotate = true;
+      controls.autoRotateSpeed = 1.4;
+
+      window.addEventListener('resize', () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+      });
+
+      // Hover a numbered waypoint → tooltip explains why the agent chose that move
+      renderer.domElement.addEventListener('pointermove', (e) => {
+        const rect = renderer.domElement.getBoundingClientRect();
+        mouseNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouseNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouseNDC, camera);
+        const el = document.getElementById('wp-info');
+        const hits = raycaster.intersectObjects(wpPillars, false);
+        if (hits.length) {
+          const idx = hits[0].object.userData.idx;
+          const s = steps && steps[idx] ? steps[idx] : null;
+          el.innerHTML = s
+            ? `<b>✦ Waypoint ${idx + 1}/${wpMarkers.length}</b> — <span class="text-slate-300">${esc(s.name || '')}: ${esc(s.detail || 'agent moves along this leg of the chosen path')}</span>`
+            : `✦ Waypoint ${idx + 1}/${wpMarkers.length} — next decision cell on the chosen path`;
+          el.classList.remove('opacity-0');
+        } else {
+          el.classList.add('opacity-0');
+        }
+      });
+
+      animate();
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       2. ANIMATION LOOP
+    ══════════════════════════════════════════════════════════════════════ */
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = clock.getDelta();
+      const t = clock.elapsedTime;
+
+      /* ── Continuous local rotations ── */
+      outerRing.rotation.x += dt * 1.2;
+      outerRing.rotation.y += dt * 1.8;
+      innerRing.rotation.y -= dt * 2.4;
+      innerRing.rotation.z += dt * 1.2;
+      coreMesh.rotation.y += dt * 0.7;
+
+      // Pulse the core (breathing effect)
+      const pulse = 1 + Math.sin(t * 2.6) * 0.08;
+      coreMesh.scale.set(pulse, pulse, pulse);
+      coreMesh.material.emissiveIntensity = 0.8 + Math.sin(t * 3.1) * 0.35;
+
+      // Satellites orbit / bob
+      satellites.forEach((s, i) => {
+        const a = t * s.userData.speed + s.userData.phase;
+        s.position.set(
+          Math.cos(a) * s.userData.radius,
+          Math.sin(a * 1.3 + i) * 0.4,
+          Math.sin(a) * s.userData.radius * (s.userData.plane % 2 ? -1 : 1)
+        );
+      });
+
+      /* ── Star fields drift / twinkle ── */
+      starLayerA.mesh.rotation.y = t * 0.012;
+      starLayerB.mesh.rotation.y = -t * 0.008;
+      starLayerA.mat.opacity = 0.65 + Math.sin(t * 1.7) * 0.2;
+      starLayerB.mat.opacity = 0.4 + Math.cos(t * 1.3) * 0.15;
+
+      /* ── Spline travel ── */
+      if (isFlying && splineCurve) {
+        // Curvature-aware, eased speed — glides out of corners, eases in/out
+        const tg0 = splineCurve.getTangentAt(Math.min(animationProgress, 0.999));
+        let spFactor = speedMul;
+        spFactor *= 0.4 + 0.6 * THREE.MathUtils.smoothstep(animationProgress, 0, 0.14);      // ease-in launch
+        spFactor *= 0.3 + 0.7 * (1 - THREE.MathUtils.smoothstep(animationProgress, 0.8, 1)); // ease-out land
+        if (prevTangentValid && lastTangent.lengthSq() > 1e-6) {
+          const ang = lastTangent.angleTo(tg0);
+          spFactor *= THREE.MathUtils.clamp(1.7 / (1 + ang * 2.6), 0.45, 1.8); // slow into sharp turns
+        }
+        animationProgress += dt * 0.045 * spFactor;
+        prevTangentValid = true;
+        if (animationProgress >= 1) {
+          animationProgress = 1;
+          isFlying = false;
+          setStatus('Arrived at target', 'ok');
+          setChip('arrived');
+          document.getElementById('step-line').textContent = steps.length
+            ? `✓ Completed — all ${steps.length} phases shown`
+            : '✓ Flight complete';
+          if (steps.length && stepItems.length) {
+            stepItems.forEach((el, i) => el.classList.toggle('step-active', i === steps.length - 1));
+          }
+          log('Flight complete — agent arrived at target waypoint.', '#5eead4');
+          spawnRipples(splineCurve.getPointAt(1));
+        }
+
+        const p = splineCurve.getPointAt(animationProgress);
+        const tg = splineCurve.getTangentAt(animationProgress);
+
+        // Agent flies slightly above ground, follows spline
+        agentGroup.position.set(p.x, p.y, p.z);
+        agentGroup.lookAt(p.clone().add(tg));
+
+        // Bank into turns (roll around forward axis)
+        const bank = THREE.MathUtils.clamp((tg.x * 0.6 - tg.z * 0.4) * 1.8, -0.45, 0.45);
+        agentGroup.rotateZ(bank);
+        lastTangent.copy(tg);
+
+        // Rainbow comet trail — hue shifts with progress so direction stays readable
+        updateTrailColors(animationProgress);
+
+        // Waypoint decision markers: flash as the agent commits to the next leg
+        if (wpMarkers.length > 1) {
+          const wIdx = Math.min(Math.floor(animationProgress * (wpMarkers.length - 1)), wpMarkers.length - 1);
+          if (wIdx !== activeWp) {
+            activeWp = wIdx;
+            paintWaypoints(activeWp);
+            wpMarkers[activeWp].userData.flash = 1;
+          }
+        }
+        for (const w of wpMarkers) {
+          if (w.userData.flash > 0) {
+            w.userData.flash = Math.max(0, w.userData.flash - dt * 1.2);
+            const s = 1 + w.userData.flash * 0.45;
+            w.scale.set(s, s, s);
+          }
+        }
+
+        // Cinematic follow camera — sits behind the agent, looks where it's going
+        if (followMode) {
+          camAnchor.copy(tg).multiplyScalar(-3.6).add(agentGroup.position);
+          camAnchor.y = Math.max(1.1, agentGroup.position.y + 2.2);
+          camera.position.lerp(camAnchor, dt * 2.4);
+          controls.target.lerp(agentGroup.position, dt * 2.4);
+        }
+
+        // Trail
+        trail.unshift(agentGroup.position.clone());
+        if (trail.length > MAX_TRAIL) trail.pop();
+        const posAttr = trailLine.geometry.attributes.position;
+        for (let i = 0; i < MAX_TRAIL; i++) {
+          const pt = trail[i] || agentGroup.position;
+          posAttr.array[i*3]   = pt.x;
+          posAttr.array[i*3+1] = pt.y;
+          posAttr.array[i*3+2] = pt.z;
+        }
+        posAttr.needsUpdate = true;
+
+        // Pellet collection (maze / Pac-Man style) — eats them as it passes
+        if (pellets.length) {
+          for (let i = 0; i < pellets.length; i++) {
+            if (pellets[i].visible && pellets[i].position.distanceToSquared(agentGroup.position) < 0.9) {
+              pellets[i].visible = false;
+              eatenCount++;
+            }
+          }
+          if (!pelletsDone && eatenCount >= pellets.length) {
+            pelletsDone = true;
+            log(`All ${pellets.length} pellets collected — maze clear!`, '#facc15');
+          }
+        }
+
+        // Ghost chase: flies its own pursuit spline, shows predicted next cell
+        if (ghostActive && ghostSpline) {
+          ghostProgress += dt * ghostSpeed;
+          if (ghostProgress >= 1) {
+            ghostProgress = 1;
+            ghostActive = false;
+            document.getElementById('ghost-line').textContent = '👻 Ghost: chase complete — predicted path shown';
+            log('👻 Ghost caught up — chase algorithm ran to completion.', '#f87171');
+          } else {
+            const gp = ghostSpline.getPointAt(ghostProgress);
+            const gt = ghostSpline.getTangentAt(ghostProgress);
+            ghostGroup.position.set(gp.x, gp.y, gp.z);
+            ghostGroup.position.y += Math.sin(t * 3.2) * 0.05; // spooky bob
+            ghostGroup.lookAt(gp.clone().add(gt));
+
+            // Predicted next cell = the next waypoint ahead of current progress
+            const span = ghostWaypoints.length - 1;
+            const segIdx = Math.min(Math.floor(ghostProgress * span), span - 1);
+            const nextIdx = Math.min(segIdx + 1, ghostWaypoints.length - 1);
+            const next = ghostWaypoints[nextIdx];
+            ghostNextMarker.position.set(next.x, 0.07, next.z);
+            ghostNextMarker.material.opacity = 0.5 + Math.sin(t * 7) * 0.3;
+
+            // Arrow from ghost to its predicted next cell
+            const arrowPos = ghostArrow.geometry.attributes.position;
+            arrowPos.array[0] = gp.x; arrowPos.array[1] = gp.y + 0.1; arrowPos.array[2] = gp.z;
+            arrowPos.array[3] = next.x; arrowPos.array[4] = 0.15; arrowPos.array[5] = next.z;
+            arrowPos.needsUpdate = true;
+
+            document.getElementById('ghost-line').textContent =
+              `👻 Ghost next: (${next.x.toFixed(1)}, ${next.z.toFixed(1)}) — intercepting`;
+          }
+        }
+
+        // Step-by-step breakdown syncs with flight progress
+        if (steps.length) {
+          const idx = Math.min(Math.floor(animationProgress * steps.length), steps.length - 1);
+          if (idx !== lastStep) {
+            lastStep = idx;
+            const s = steps[idx];
+            document.getElementById('step-line').textContent = `Step ${idx + 1}/${steps.length} — ${s.name || ''}`;
+            stepItems.forEach((el, i) => el.classList.toggle('step-active', i === idx));
+            updatePhaseRibbon(idx);
+          }
+        }
+
+        // Target marker pulses at end point
+        const end = splineCurve.getPointAt(1);
+        targetMarker.position.set(end.x, 0.06, end.z);
+        beamMesh.position.set(end.x, 1.2, end.z);
+        targetMarker.material.opacity = 0.45 + Math.sin(t * 6) * 0.3;
+        beamMesh.material.opacity = 0.28 + Math.sin(t * 6) * 0.16;
+
+        // Travel percentage HUD
+        document.getElementById('travel-pct').textContent = Math.round(animationProgress * 100) + '%';
+      } else {
+        /* ── Idle: agent cruises a floating Lissajous path ── */
+        updateTrailColors(0.58); // calm blue while cruising
+        const ix = Math.cos(t * 0.45) * 3.4;
+        const iz = Math.sin(t * 0.55) * 3.4;
+        const iy = 1.0 + Math.sin(t * 0.9) * 0.55;
+        agentGroup.position.lerp(new THREE.Vector3(ix, iy, iz), dt * 1.2);
+        // subtle banking while drifting
+        const bankIdle = Math.sin(t * 0.45) * 0.25;
+        agentGroup.rotation.z = bankIdle;
+
+        if (targetMarker.material.opacity > 0) {
+          targetMarker.material.opacity = Math.max(0, targetMarker.material.opacity - dt);
+          beamMesh.material.opacity = Math.max(0, beamMesh.material.opacity - dt * 3);
+        }
+      }
+
+      /* ── Ripple expansion at arrival ── */
+      for (let i = ripples.length - 1; i >= 0; i--) {
+        const r = ripples[i];
+        r.userData.age += dt;
+        if (r.userData.age < r.userData.delay) continue;
+        const a = r.userData.age - r.userData.delay;
+        const s = 0.4 + a * 2.6;
+        r.scale.set(s, s, 1);
+        r.material.opacity = Math.max(0, 0.85 - a * 0.42);
+        if (a > 2) {
+          scene.remove(r);
+          ripples.splice(i, 1);
+        }
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    function spawnRipples(pos) {
+      const colors = [0x2dd4bf, 0x38bdf8, 0x22d3ee];
+      colors.forEach((c, i) => {
+        const ring = new THREE.Mesh(
+          new THREE.RingGeometry(0.5, 0.62, 48),
+          new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
+        );
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.set(pos.x, 0.06, pos.z);
+        ring.userData = { age: 0, delay: i * 0.14 };
+        scene.add(ring);
+        ripples.push(ring);
+      });
+      log('Target waypoint reached — spatial ripples emitted.', '#a5b4fc');
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       3. GEMINI API CALL
+    ══════════════════════════════════════════════════════════════════════ */
+    const SYSTEM_PROMPT = `You are an AI study assistant for the course "ARTIFICIAL INTELLIGENCE". When a question matches a syllabus topic, answer from it and tag the unit.
+SYLLABUS:
+UNIT-I Introduction to AI: History and Foundations of AI; Types of AI; Domain of AI; Intelligent Agents (Agents and Environments, Good Behavior / Concept of Rationality, Nature of Environments, Structure of Agents); Problem-Solving Agents; Search Algorithms; Uninformed Search Strategies (BFS, DFS, Uniform-Cost, depth-limited, iterative deepening, bidirectional).
+UNIT-II Problem-Solving: Informed (Heuristic) Search (greedy best-first, A*); Local Search and Optimization (hill climbing, simulated annealing, genetic); Local Search in Continuous Spaces; Search with Nondeterministic Actions; Search in Partially Observable Environments; Online Search Agents and Unknown Environments.
+UNIT-III Game Playing and CSP: Game Theory; Optimal Decisions in Games (minimax); Heuristic Alpha-Beta Tree Search; Monte Carlo Tree Search; Stochastic Games; Partially Observable Games; CSP definition; Constraint Propagation (arc consistency); Backtracking Search for CSPs; Case study: AI Tools and Frameworks.
+UNIT-IV Logical Reasoning: Knowledge-Based Agents; Propositional Logic; Propositional Theorem Proving; Effective Propositional Model Checking; Agents Based on Propositional Logic; First-Order Logic Representation; Syntax and Semantics of FOL; Knowledge Engineering in FOL; Propositional vs FOL Inference; Forward Chaining; Backward Chaining; Resolution.
+UNIT-V Machine Learning and AI Applications: ML basics; Learning from Examples; forms of learning (supervised, unsupervised, reinforcement learning); AI applications (Finance, Agriculture, Smart Cities, Education); Introduction to Generative AI (GenAI).
+
+Respond ONLY with strict JSON matching this schema:
+{
+  "algorithm": "Name of the algorithm or concept that best fits the question (e.g., 'A* Search', 'Minimax with Alpha-Beta Pruning', 'Backtracking Search for CSPs')",
+  "unit": "Syllabus unit tag, e.g. 'Unit II · Problem-Solving'. Use '' when the topic is off-syllabus.",
+  "answer": "Clear explanation (max ~150 words). If the user asks 'which is best for X', justify the recommendation against the alternatives.",
+  "motionReason": "1-2 sentences explaining how the 3D path shape maps to how the algorithm executes from start to end.",
+  "codeSnippet": "Short pseudocode/code for the algorithm",
+  "visualStyle": "one of: maze, grid, spiral, wave, orbit, radial",
+  "path3D": [{"x": number, "y": 0.6, "z": number}],
+  "steps": [{"name": "short phase title", "detail": "one sentence describing this phase"}],
+  "ghostPath3D": [{"x": number, "y": 0.6, "z": number}],
+  "ghostAlgorithm": "string — e.g. 'Greedy closest-cell chase' or 'BFS toward Pac-Man'",
+  "ghostExplanation": "1-2 sentences explaining how the ghost picks its very next cell (distance metric + tie break)",
+  "ghostNextStep": {"x": number, "z": number}
+}
+rules:
+- GHOST RULE: ONLY when the query mentions Pac-Man, ghosts, chasing, or pursuit, ALSO return the ghost fields: ghostPath3D = 5 to 8 points inside -8..8 that trail AND intercept the main path (so the chase is visible); ghostAlgorithm = the pursuit strategy name; ghostExplanation = the exact decision for the ghost's next move (e.g., 'measures Manhattan distance to Pac-Man's cell, moves to the adjacent corridor cell that reduces it; ties broken toward the target'); ghostNextStep = the predicted cell the ghost enters next.
+- visualStyle: maze=corridor traversal with walls+pellets (pathfinding), grid=cell-by-cell scan (CSP/backtracking/board algorithms), spiral=spiral sweep (Spiral Matrix, radial patterns), wave=periodic motion, orbit=closed loop (games/deterministic cycles), radial=layer growth (BFS/Dijkstra/flood fill)
+- steps: 4 to 8 phases describing execution start-to-end (example for A*: Initialize open/closed sets → expand lowest-f node → evaluate neighbors → update scores/pointers → reconstruct path)
+- path3D: 5 to 10 points, x and z within -8..8, y = 0.6
+- coordinates as numbers only, no markdown fences.`;
+
+    /* ── Robust JSON extraction: models often mangle the shape of the reply ── */
+    function extractJSON(text) {
+      if (text == null) throw new Error('Model returned empty output.');
+      let t = String(text).replace(/^\uFEFF/, '').trim();
+      // Case 1: answer is fenced in a markdown code block
+      const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+      if (fence) t = fence[1].trim();
+
+      const tryParse = (s) => { try { return JSON.parse(s); } catch (e) { return undefined; } };
+      const isPlainObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+      // unwrap a JSON value that is itself a double-encoded JSON string
+      const unwrap = (v) => {
+        if (isPlainObj(v)) return v;
+        if (typeof v === 'string' && /^\s*[{[]/.test(v)) {
+          const inner = tryParse(v.trim());
+          return isPlainObj(inner) ? inner : undefined;
+        }
+        return undefined;
+      };
+
+      // Case 2: already valid JSON object (arrays/strings are NOT accepted here)
+      { const got = unwrap(tryParse(t)); if (got) return got; }
+
+      // Case 3: skim prose, find the balanced { ... } block (brace-aware)
+      const first = t.indexOf('{');
+      if (first >= 0) {
+        let depth = 0, inStr = false, esc = false;
+        for (let i = first; i < t.length; i++) {
+          const ch = t[i];
+          if (esc) { esc = false; continue; }
+          if (ch === '\\' && inStr) { esc = true; continue; }
+          if (ch === '"') inStr = !inStr;
+          if (inStr) continue;
+          if (ch === '{') depth++;
+          else if (ch === '}') {
+            depth--;
+            if (depth === 0) {
+              const cand = t.slice(first, i + 1);
+              { const got = unwrap(tryParse(cand)); if (got) return got; }
+              // Case 4: tolerate trailing commas
+              const fixed = cand.replace(/,\s*([}\]])/g, '$1');
+              { const got = unwrap(tryParse(fixed)); if (got) return got; }
+              // Case 5: repair unquoted keys (common model slip)
+              const quoteKeys = (s) => s.replace(/([{,]\s*)([A-Za-z_$][\w$]*)(\s*:)/g, '$1"$2"$3');
+              { const got = unwrap(tryParse(quoteKeys(fixed))); if (got) return got; }
+            }
+          }
+        }
+      }
+      throw new Error('No valid JSON object found in the model output.');
+    }
+
+    /* ── Model resolution: ask ModelService.ListModels what your key can use ── */
+    const MODEL_PREFERENCE = [
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+      'gemini-2.5-pro',
+      'gemini-2.0-pro',
+      'gemini-1.5-pro'
+    ];
+    let modelCacheKey = null;
+    let modelCache = null;
+
+    // Local server-side proxy (our Node server forwards to Google so the browser
+    // never hits CORS/network blocks). When opened as file:// this stays null.
+    const proxyBase = /^https?:$/.test(location.protocol) ? location.origin : null;
+
+    function buildModelList(apiModels) {
+      const supported = apiModels
+        .filter(m => Array.isArray(m.supportedGenerationMethods) &&
+                     m.supportedGenerationMethods.includes('generateContent'))
+        .map(m => String(m.name || '').replace(/^models\//, ''))
+        .filter(Boolean);
+      const byPref = [];
+      for (const p of MODEL_PREFERENCE) if (supported.includes(p)) byPref.push(p);
+      const rest = supported.filter(m => !byPref.includes(m));
+      return byPref.concat(rest).slice(0, 8);
+    }
+
+    async function proxyListModels(key) {
+      const r = await fetch(`${proxyBase}/api/models?key=${encodeURIComponent(key)}`);
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || data.error) throw new Error(data.error ? data.error.message : `HTTP ${r.status}`);
+      if (!Array.isArray(data.models)) throw new Error('Malformed model list from proxy.');
+      return data.models;
+    }
+
+    async function directListModels(key) {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`);
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || data.error) throw new Error(data.error ? data.error.message : `HTTP ${r.status}`);
+      if (!Array.isArray(data.models)) throw new Error('Malformed model list from API.');
+      return data.models;
+    }
+
+    async function resolveModels(apiKey) {
+      if (modelCache && modelCacheKey === apiKey) return modelCache;
+      const attempts = proxyBase
+        ? [['local proxy', proxyListModels], ['direct API', directListModels]]
+        : [['direct API', directListModels]];
+      const errs = [];
+      for (const [name, fn] of attempts) {
+        try {
+          const apiModels = await fn(apiKey);
+          modelCache = buildModelList(apiModels);
+          modelCacheKey = apiKey;
+          log(`Model list via ${name} — found ${apiModels.length}, will try: ${modelCache.join(', ')}`, '#5eead4');
+          return modelCache;
+        } catch (err) {
+          errs.push(`${name}: ${err.message}`);
+          console.warn(`ListModels via ${name} failed:`, err.message);
+        }
+      }
+      if (errs.length) console.warn('All model-list channels failed:', errs.join(' | '));
+      return MODEL_PREFERENCE.slice();
+    }
+
+    // generateContent through proxy first, then direct — whichever works
+    async function geminiGenerate(model, key, payload) {
+      const errs = [];
+      if (proxyBase) {
+        try {
+          const r = await fetch(`${proxyBase}/api/gemini`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model, key, payload })
+          });
+          const data = await r.json().catch(() => ({}));
+          if (r.ok && data && !data.error) return { via: 'local proxy', ok: true, data };
+          if (r.status < 500 && data && data.error) throw new Error(data.error.message);
+          errs.push('proxy: HTTP ' + r.status);
+        } catch (e) {
+          errs.push('proxy: ' + e.message);
+        }
+      }
+      try {
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
+        );
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || data.error) throw new Error(data.error ? data.error.message : `HTTP ${r.status}`);
+        return { via: 'direct', ok: true, data };
+      } catch (e) {
+        errs.push('direct: ' + e.message);
+        throw new Error(errs.join(' | '));
+      }
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       3b. TOPIC-AWARE 3D SCENE RENDERING
+    ══════════════════════════════════════════════════════════════════════ */
+    const STYLE_INFO = {
+      maze:   { label: 'Maze · Pellet Hunt',    reason: 'The agent threads between corridor walls and collects every pellet in visiting order — the same way Pac-Man and maze pathfinding (BFS/DFS/A*) explore walkable corridors toward a goal.' },
+      grid:   { label: 'Grid · Board Scan',     reason: 'The agent hops from cell to cell across a board, exactly how constraint solvers like Sudoku backtracking step through candidate cells one at a time.' },
+      spiral: { label: 'Spiral · Ring Sweep',   reason: 'The agent winds along an expanding spiral — the same order used by Spiral Matrix traversals and radial neighborhood searches.' },
+      wave:   { label: 'Wave · Periodic Loop',  reason: 'The agent rides a periodic oscillating curve, like Lissajous patterns or wave interference, where position is a blend of repeating frequencies.' },
+      orbit:  { label: 'Orbit · Closed Cycle',  reason: 'The agent loops a closed trajectory, representing circular patterns: round-robin scheduling, ring buffers, or orbital mechanics.' },
+      radial: { label: 'Radial · Flood Bloom',  reason: 'The agent radiates outward from the center, like Dijkstra/BFS layers or flood-fill — visiting everything at distance k before k+1.' }
+    };
+
+    function detectStyle(payload, queryText) {
+      const q = ((queryText || '') + ' ' + (payload.algorithm || '')).toLowerCase();
+      const vs = String(payload.visualStyle || '').toLowerCase();
+      if (vs && STYLE_INFO[vs]) return vs;
+      if (/(pacman|maze|pellet|ghost|corridor|pathfind|wall)/.test(q)) return 'maze';
+      if (/(sudoku|board|grid|puzzle|chess|checker|crossword|matrix cell)/.test(q)) return 'grid';
+      if (/(spiral|snail|helix|wind)/.test(q)) return 'spiral';
+      if (/(wave|sine|cosine|periodic|lissajous|vibrat|oscillat)/.test(q)) return 'wave';
+      if (/(orbit|round.?robin|ring buffer|cycle|circular|rotate|loop)/.test(q)) return 'orbit';
+      if (/(flood|bfs|dijkstra|radiat|bloom|nearest|grow)/.test(q)) return 'radial';
+      // Syllabus-aware heuristics (Unit III–V)
+      if (/(minimax|alpha.?beta|monte carlo|game theory|zero.?sum|adversarial|game tree)/.test(q)) return 'grid';
+      if (/(machine learning|supervised|unsupervised|reinforcement|neural|gradient|regression|clust|k.?means|train)/.test(q)) return 'radial';
+      if (/(resolution|chaining|logical|proposit|first.?order|theorem|proof|inference|entailment|knowledge base)/.test(q)) return 'spiral';
+      if (/(gen ?ai|generative ai|llm|gpt|diffusion|prompt engineer)/.test(q)) return 'wave';
+      return 'orbit';
+    }
+
+    function clearDecorations() {
+      if (!decoGroup) return;
+      while (decoGroup.children.length) decoGroup.remove(decoGroup.children[0]);
+      pellets.length = 0;
+      gridHints.length = 0;
+      wpMarkers.length = 0;
+      wpPillars.length = 0;
+      phaseRibbon = null;
+      activeWp = -1;
+      const wpInfo = document.getElementById('wp-info');
+      if (wpInfo) wpInfo.classList.add('opacity-0');
+    }
+
+    function mulberry32(seed) {
+      let a = seed >>> 0;
+      return function () {
+        a |= 0; a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    function hashStr(s) {
+      let h = 2166136261;
+      for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+      return h >>> 0;
+    }
+
+    function renderScene(style, points3D) {
+      switch (style) {
+        case 'maze':   decoMaze(points3D, hashStr(document.getElementById('query-input').value || 'maze')); break;
+        case 'grid':   decoGrid(points3D); break;
+        case 'spiral': decoSpiralGuide(); break;
+        case 'wave':   decoWaveField(); break;
+        case 'radial': decoRadial(); break;
+        default:       break; // 'orbit' — keep the clean stage, only the trail path
+      }
+    }
+
+    /* ── Maze (Pac-Man style): room walls + seeded blocks + pellets ── */
+    function decoMaze(points3D, seed) {
+      const rnd = mulberry32(seed);
+      const wallMat = new THREE.MeshStandardMaterial({
+        color: 0x2563eb, emissive: 0x1e3a8a, emissiveIntensity: 0.35, roughness: 0.55
+      });
+      const wallH = 0.55;
+      const box = (x, z, w, d) => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, wallH, d), wallMat);
+        m.position.set(x, wallH / 2, z);
+        decoGroup.add(m);
+      };
+      // Outer room walls
+      box(0, -8.35, 17.3, 0.7); box(0, 8.35, 17.3, 0.7);
+      box(-8.35, 0, 0.7, 17.3); box(8.35, 0, 0.7, 17.3);
+
+      // Inner wall blocks on a lattice, never overlapping the flight path
+      const nearPath = (x, z) => points3D.some(p => Math.hypot(p.x - x, p.z - z) < 1.25);
+      const placed = [];
+      for (let i = 0; i < 14 && placed.length < 7; i++) {
+        const gx = (Math.floor(rnd() * 7) - 3) * 2.1;
+        const gz = (Math.floor(rnd() * 7) - 3) * 2.1;
+        if (nearPath(gx, gz)) continue;
+        if (placed.some(q => Math.hypot(q.x - gx, q.z - gz) < 2.3)) continue;
+        placed.push({ x: gx, z: gz });
+        box(gx, gz, 0.7 + rnd() * 1.6, 0.7 + rnd() * 1.6);
+      }
+
+      // Pellets seeded on the trail — agent eats them as it passes
+      const pelletMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+      points3D.forEach(p => {
+        const m = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 10), pelletMat);
+        m.position.set(THREE.MathUtils.clamp(p.x, -7.5, 7.5), 0.18, THREE.MathUtils.clamp(p.z, -7.5, 7.5));
+        decoGroup.add(m);
+        pellets.push(m);
+      });
+      log(`Maze laid out — ${pellets.length} pellets seeded along the corridor. Eat them all!`, '#facc15');
+    }
+
+    /* ── Grid (Sudoku-style): faint 3×3 boxes + cell lines + path markers ── */
+    function decoGrid(points3D) {
+      const n = 9, size = 15, cell = size / n;
+      const off = -size / 2;
+      const thin = new THREE.LineBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.65 });
+      const thick = new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.95 });
+      const fillMat = new THREE.MeshBasicMaterial({ color: 0x2dd4bf, transparent: true, opacity: 0.045, side: THREE.DoubleSide });
+      for (let br = 0; br < n; br += 3) {
+        for (let bc = 0; bc < n; bc += 3) {
+          const f = new THREE.Mesh(new THREE.PlaneGeometry(cell * 3, cell * 3), fillMat);
+          f.rotation.x = -Math.PI / 2;
+          f.position.set(off + (bc + 1.5) * cell, 0.015, off + (br + 1.5) * cell);
+          decoGroup.add(f);
+        }
+      }
+      const line = (a, b, mat) => {
+        const g = new THREE.BufferGeometry().setFromPoints([a, b]);
+        decoGroup.add(new THREE.Line(g, mat));
+      };
+      for (let i = 0; i <= n; i++) {
+        const v = off + i * cell;
+        const mat = i % 3 === 0 ? thick : thin;
+        line(new THREE.Vector3(v, 0.02, off), new THREE.Vector3(v, 0.02, off + size), mat);
+        line(new THREE.Vector3(off, 0.02, v), new THREE.Vector3(off + size, 0.02, v), mat);
+      }
+      const hintMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.55 });
+      points3D.forEach(p => {
+        const r = new THREE.Mesh(new THREE.RingGeometry(0.28, 0.34, 24), hintMat);
+        r.rotation.x = -Math.PI / 2;
+        r.position.set(p.x, 0.05, p.z);
+        decoGroup.add(r);
+        gridHints.push(r);
+      });
+      log(`Sudoku-style grid laid out (9×9) — ${points3D.length} candidate cells marked on the path.`, '#7dd3fc');
+    }
+
+    /* ── Spiral floor guide ── */
+    function decoSpiralGuide() {
+      const pts = [];
+      for (let a = 0; a < Math.PI * 5.5; a += 0.12) {
+        const r = a * 0.45;
+        if (r > 8) break;
+        pts.push(new THREE.Vector3(Math.cos(a) * r, 0.02, Math.sin(a) * r));
+      }
+      const g = new THREE.BufferGeometry().setFromPoints(pts);
+      decoGroup.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x2dd4bf, transparent: true, opacity: 0.4 })));
+      log('Spiral sweep guide drawn on the floor.', '#7dd3fc');
+    }
+
+    /* ── Periodic wave field guide ── */
+    function decoWaveField() {
+      for (let row = -6; row <= 6; row += 1.5) {
+        const arr = new Float32Array(41 * 3);
+        for (let i = 0; i < 41; i++) {
+          const x = -8 + i * 0.4;
+          arr[i*3] = x; arr[i*3+1] = 0.02; arr[i*3+2] = row + Math.sin(x * 0.7 + row) * 1.6;
+        }
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+        decoGroup.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.28 })));
+      }
+      log('Wave field guide drawn — watch the periodic drifting path.', '#7dd3fc');
+    }
+
+    /* ── Radial rings guide ── */
+    function decoRadial() {
+      const m = new THREE.MeshBasicMaterial({ color: 0x2dd4bf, transparent: true, opacity: 0.22, side: THREE.DoubleSide });
+      for (let r = 1; r <= 7; r += 1.5) {
+        const ring = new THREE.Mesh(new THREE.RingGeometry(r, r + 0.06, 64), m);
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.y = 0.02;
+        decoGroup.add(ring);
+      }
+      log('Radial rings laid out — expansion sweeps outward from the center.', '#7dd3fc');
+    }
+
+    /* ── HSLA→RGB helper for the comet trail ── */
+    function hslRgb(h, s, l) {
+      h = ((h % 1) + 1) % 1;
+      const c = (1 - Math.abs(2 * l - 1)) * s;
+      const x = c * (1 - Math.abs((h * 6) % 2 - 1));
+      const m = l - c / 2;
+      let r = 0, g = 0, b = 0;
+      if (h < 1/6)      { r = c; g = x; }
+      else if (h < 2/6) { r = x; g = c; }
+      else if (h < 3/6) { g = c; b = x; }
+      else if (h < 4/6) { g = x; b = c; }
+      else if (h < 5/6) { r = x; b = c; }
+      else              { r = c; b = x; }
+      return { r: r + m, g: g + m, b: b + m };
+    }
+
+    // Rainbow comet: head is bright & saturated, tail melts away — hue sweeps with progress
+    function updateTrailColors(hueBase) {
+      const col = trailLine.geometry.attributes.color;
+      for (let i = 0; i < MAX_TRAIL; i++) {
+        const f = 1 - i / MAX_TRAIL; // 1 at the head
+        const c = hslRgb(hueBase * 0.55 - 0.15 + f * 0.28, 0.95, 0.18 + f * 0.52);
+        col.array[i*3] = c.r; col.array[i*3+1] = c.g; col.array[i*3+2] = c.b;
+      }
+      col.needsUpdate = true;
+    }
+
+    function stepColor(i) { return STEP_COLORS[i % STEP_COLORS.length]; }
+
+    /* ── Numbered decision beacon (canvas sprite, camera-facing) ── */
+    function makeNumberSprite(i) {
+      const c = document.createElement('canvas');
+      c.width = 128; c.height = 128;
+      const ctx = c.getContext('2d');
+      ctx.beginPath(); ctx.arc(64, 64, 56, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(2,6,23,0.72)'; ctx.fill();
+      ctx.lineWidth = 9;
+      ctx.strokeStyle = '#' + new THREE.Color(stepColor(i)).getHexString(); ctx.stroke();
+      ctx.font = 'bold 62px Consolas, monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#f1f5f9';
+      ctx.fillText(String(i + 1), 64, 66);
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, opacity: 0.96 }));
+      sp.scale.set(0.95, 0.95, 1);
+      return sp;
+    }
+
+    /* ── Phase-colored ground ribbon: shows the traversal order + which step each leg belongs to ── */
+    function buildPhaseRibbon(points3D, stCount) {
+      if (points3D.length < 2) return;
+      const arr = new Float32Array(points3D.length * 3);
+      const col = new Float32Array(points3D.length * 3);
+      points3D.forEach((p, i) => { arr[i*3] = p.x; arr[i*3+1] = 0.05; arr[i*3+2] = p.z; });
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending }));
+      line.frustumCulled = false;
+      line.userData = { vertCount: points3D.length, segCount: points3D.length - 1, stepCount: Math.max(1, stCount || 1) };
+      decoGroup.add(line);
+      phaseRibbon = line;
+      updatePhaseRibbon(-1);
+    }
+
+    // Each frame: brighten the leg belonging to the current algorithm phase, dim the rest
+    function updatePhaseRibbon(activeStep) {
+      if (!phaseRibbon) return;
+      const col = phaseRibbon.geometry.attributes.color;
+      const n = phaseRibbon.userData.vertCount;
+      const segs = phaseRibbon.userData.segCount;
+      const sts = phaseRibbon.userData.stepCount;
+      for (let i = 0; i < n; i++) {
+        const seg = Math.min(segs - 1, Math.round((i / (n - 1)) * segs));
+        const st = Math.min(sts - 1, Math.floor((seg / segs) * sts));
+        const c = new THREE.Color(stepColor(st));
+        const d = (activeStep >= 0 && st === activeStep) ? 1 : 0.38;
+        col.array[i*3] = c.r * d; col.array[i*3+1] = c.g * d; col.array[i*3+2] = c.b * d;
+      }
+      col.needsUpdate = true;
+    }
+
+    /* ── Numbered waypoint beacons + direction arrows: WHY the path goes each way ── */
+    function buildWaypointBeacons(points3D) {
+      points3D.forEach((p, i) => {
+        const grp = new THREE.Group();
+        const col = new THREE.Color(stepColor(i));
+        // floor ring
+        const ring = new THREE.Mesh(
+          new THREE.RingGeometry(0.3, 0.42, 32),
+          new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending })
+        );
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.set(p.x, 0.045, p.z);
+        // glowing pillar (raycast target + phase intensity)
+        const pillar = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.06, 0.1, 1.1, 12),
+          new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.45, roughness: 0.3 })
+        );
+        pillar.position.set(p.x, 0.55, p.z);
+        pillar.userData = { idx: i };
+        // direction cone → shows the chosen next cell
+        if (i < points3D.length - 1) {
+          const d = new THREE.Vector3(points3D[i+1].x - p.x, 0, points3D[i+1].z - p.z).normalize();
+          const cone = new THREE.Mesh(
+            new THREE.ConeGeometry(0.13, 0.5, 12),
+            new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.6, roughness: 0.3 })
+          );
+          cone.position.set(p.x + d.x * 0.9, 0.16, p.z + d.z * 0.9);
+          cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d);
+          grp.add(cone);
+        }
+        // floating number label
+        const num = makeNumberSprite(i);
+        num.position.set(p.x, 1.62, p.z);
+        grp.add(ring, pillar, num);
+        grp.userData = { idx: i, flash: 0 };
+        decoGroup.add(grp);
+        wpMarkers.push(grp);
+        wpPillars.push(pillar);
+      });
+      log(`${points3D.length} decision waypoints marked — arrows show the chosen traversal order. Hover a number for the why.`, '#a5b4fc');
+    }
+
+    function paintWaypoints(active) {
+      wpPillars.forEach(p => {
+        p.material.emissiveIntensity = p.userData.idx <= active ? 1.25 : 0.45;
+      });
+    }
+
+    /* ── Ghost chase setup (Pac-Man style queries) ── */
+    function setupGhost(payload) {
+      const gPath = payload.ghostPath3D;
+      if (gPath && Array.isArray(gPath) && gPath.length > 1) {
+        ghostWaypoints = gPath.map(p => new THREE.Vector3(
+          THREE.MathUtils.clamp(+p.x, -8, 8),
+          +p.y || 0.6,
+          THREE.MathUtils.clamp(+p.z, -8, 8)
+        ));
+        ghostSpline = new THREE.CatmullRomCurve3(ghostWaypoints, false, 'centripetal');
+        ghostProgress = 0;
+        ghostActive = true;
+        ghostSpeed = 0.78;
+        ghostGroup.visible = true;
+        ghostNextMarker.visible = true;
+        ghostArrow.visible = true;
+        document.getElementById('ghost-algo').textContent = payload.ghostAlgorithm || 'Chase algorithm (BFS / greedy)';
+        document.getElementById('ghost-why').textContent = payload.ghostExplanation || 'The ghost keeps moving so its distance to the agent shrinks every turn.';
+        document.getElementById('ghost-block').classList.remove('hidden');
+        const ns = payload.ghostNextStep;
+        const nextText = ns ? `(${Number(ns.x).toFixed(1)}, ${Number(ns.z).toFixed(1)})` : 'computed live — see HUD';
+        document.getElementById('ghost-next').textContent = nextText;
+        log(`👻 Ghost engaged — chase algorithm: ${payload.ghostAlgorithm || 'greedy chase'}. Predicted next cell ${nextText}.`, '#f87171');
+        return true;
+      }
+      return false;
+    }
+
+    /* ── Offline motion plan: guarantees a 3D path + explanation for ANY input ── */
+    function genericPath(style) {
+      const pts = [];
+      const push = (x, z) => pts.push({ x: +x.toFixed(2), y: 0.6, z: +z.toFixed(2) });
+      switch (style) {
+        case 'maze': { // serpentine corridor scan, row by row
+          const xs = [-6, -3, 0, 3, 6];
+          for (let row = 0; row < 5; row++) {
+            const z = -6 + row * 3;
+            const seq = row % 2 === 0 ? xs : [...xs].reverse();
+            seq.forEach((x, i) => { if (i === 0 && row > 0) return; push(x, z); });
+          }
+          break;
+        }
+        case 'grid': { // row-by-row scan of a 3×3 block
+          for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) push(-4 + c * 4, 4 - r * 4);
+          break;
+        }
+        case 'spiral': {
+          for (let a = 0; a <= Math.PI * 4; a += Math.PI * 0.5) {
+            const rr = 0.8 + a * 0.8;
+            if (rr > 8) break;
+            push(Math.cos(a) * rr, Math.sin(a) * rr);
+          }
+          break;
+        }
+        case 'wave': {
+          for (let i = 0; i <= 12; i++) { const x = -7 + (14 * i) / 12; push(x, Math.sin(x * 0.8) * 4); }
+          break;
+        }
+        case 'radial': {
+          for (let ring = 1; ring <= 4; ring++) {
+            const rr = ring * 1.8;
+            for (let a = 0; a < Math.PI * 2; a += Math.PI / 2) push(Math.cos(a) * rr, Math.sin(a) * rr);
+          }
+          break;
+        }
+        default: { // orbit circle
+          for (let i = 0; i <= 12; i++) { const a = (i / 12) * Math.PI * 2; push(Math.cos(a) * 5, Math.sin(a) * 5); }
+        }
+      }
+      return pts.slice(0, 12);
+    }
+
+    function fallbackPlan(queryText) {
+      const q = (queryText || '').toLowerCase();
+      const style = detectStyle({}, queryText);
+      const sInfo = STYLE_INFO[style] || STYLE_INFO.orbit;
+      let algorithm = sInfo.label;
+      if (/(shortest path|shortest route|best path|a\s*\*|a star|dijkstra)/.test(q)) algorithm = 'A* / Dijkstra Shortest-Path Search';
+      else if (/(bfs|breadth)/.test(q)) algorithm = 'Breadth-First Search (BFS)';
+      else if (/(dfs|depth)/.test(q)) algorithm = 'Depth-First Search (DFS)';
+      else if (/(sudoku|backtrack|n-?queens)/.test(q)) algorithm = 'Backtracking (Constraint Satisfaction Search)';
+      else if (/(pacman|maze|ghost)/.test(q)) algorithm = 'Greedy Chase + Maze Pathfinding';
+      else if (/(minimax|alpha|beta|game playing|tic.?tac)/.test(q)) algorithm = 'Minimax with Alpha-Beta Pruning';
+      else if (/(learning|neural|supervised|unsupervised|reinforcement|ml|ai model)/.test(q)) algorithm = 'Supervised Learning from Examples';
+      else if (/(sort|merge|quick|divide)/.test(q)) algorithm = 'Merge Sort (Divide & Conquer)';
+      else algorithm = sInfo.label + ' — spatial visualization';
+      const unit = '';
+      const steps = [
+        { name: 'Initialize', detail: `Set up the starting state for ${algorithm} and place the agent at the origin of the ${style} scene.` },
+        { name: 'Generate candidates', detail: (sInfo.reason.split('.')[0] || 'Enumerate the next possible moves from the current state.') + '.' },
+        { name: 'Evaluate & choose', detail: 'Score each candidate and pick the best option (or the next unexplored move) according to the algorithm rule.' },
+        { name: 'Apply move', detail: 'Execute the chosen move and update the state; the agent advances one segment along the path.' },
+        { name: 'Repeat & arrive', detail: 'Keep moving until the goal is reached, then land and emit arrival ripples.' }
+      ];
+      return {
+        algorithm,
+        unit,
+        answer: `Offline visualization of "${algorithm}" (${sInfo.label}). This plan was generated locally because the model reply was not usable — the scene still maps the topic to a ${style} layout and the steps below explain the algorithm phase by phase. For full tailored wording, ask again while the AI model is reachable.`,
+        motionReason: sInfo.reason,
+        codeSnippet: `// ${algorithm} — visualization plan generated locally (offline fallback)`,
+        visualStyle: style,
+        path3D: genericPath(style),
+        steps
+      };
+    }
+
+    async function processQuery(queryText, source = 'query') {
+      const apiKey = document.getElementById('api-key-input').value.trim();
+      const summary = document.getElementById('analysis-summary');
+
+      if (!queryText.trim()) return;
+
+      if (source !== 'demo' && !apiKey) {
+        summary.innerHTML = `<p class="text-red-400 font-semibold">⚠ Please paste your API key, or hit <span class="text-teal-400">⚡ Live Demo</span>.</p>`;
+        return;
+      }
+
+      setStatus('Thinking…', 'busy');
+      setChip('querying');
+      hideBanner();
+      steps = []; stepItems = []; lastStep = -1;
+      document.getElementById('step-line').textContent = '—';
+      // reset ghost chase state
+      ghostActive = false;
+      ghostSpline = null; ghostWaypoints = [];
+      if (ghostGroup) ghostGroup.visible = false;
+      if (ghostNextMarker) ghostNextMarker.visible = false;
+      if (ghostArrow) ghostArrow.visible = false;
+      document.getElementById('ghost-line').textContent = '—';
+      document.getElementById('ghost-block').classList.add('hidden');
+      document.getElementById('analyze-btn').disabled = true;
+      summary.innerHTML = `
+        <div class="flex items-center gap-3 text-blue-300 text-xs">
+          <div class="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+          <span>Querying neural engine & computing spatial path…</span>
+        </div>`;
+
+      let payload;
+      let usedFallback = false;
+      if (source === 'demo') {
+        payload = {
+          algorithm: '3D Lissajous Explorer',
+          answer: 'A Lissajous path traces independent sinusoidal frequencies on each axis, producing a beautiful interwoven 3D knot. The agent cruises this curve to show how non-linear periodic motion maps a chaotic-looking but fully deterministic trajectory — the same math behind oscilloscope patterns and orbital resonances.',
+          motionReason: 'The agent rides a periodic oscillating wave curve — its position blends three repeating frequencies, exactly like Lissajous patterns in physics labs and oscilloscope displays.',
+          visualStyle: 'wave',
+          unit: 'Unit V · Machine Learning & AI Applications — motion demo',
+          steps: [
+            { name: 'Choose frequencies', detail: 'The explorer picks distinct sine frequencies for the X and Z axes.' },
+            { name: 'Sample the curve', detail: 'The angle t sweeps through a full cycle, sampling points on the Lissajous knot.' },
+            { name: 'Project to 3D', detail: 'Each sample maps to XYZ coordinates inside the display volume.' },
+            { name: 'Cruise with banking', detail: 'The agent flies the spline, tilting into every turn.' },
+            { name: 'Arrive & ripple', detail: 'At the end of the loop the agent lands and emits arrival ripples.' }
+          ],
+          codeSnippet: `// 3D Lissajous path generator
+for (let t = 0; t <= 1; t += 0.02) {
+  const ang = t * Math.PI * 2;
+  const x = Math.sin(3 * ang) * 6;
+  const y = 0.6;
+  const z = Math.sin(2 * ang + 1.2) * 6;
+  path.push({ x, y, z });
+}`,
+          path3D: []
+        };
+        for (let i = 0; i <= 30; i += 3) {
+          const ang = (i / 30) * Math.PI * 2;
+          payload.path3D.push({
+            x: +Math.sin(3 * ang) * 6,
+            y: 0.6,
+            z: +Math.sin(2 * ang + 1.2) * 6
+          });
+        }
+      } else {
+        const models = await resolveModels(apiKey);
+        let responseData = null;
+        let usedModel = null;
+        let lastErrMsg = '';
+
+        for (let i = 0; i < models.length; i++) {
+          const currentModel = models[i];
+          try {
+            if (i > 0) {
+              setChip('fallback: ' + currentModel);
+              log(`Primary model failed — falling back to ${currentModel}.`, '#fbbf24');
+            }
+            const { via, ok, data } = await geminiGenerate(currentModel, apiKey, {
+              contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nUser Query: ${queryText}` }] }],
+              generationConfig: { responseMimeType: 'application/json', temperature: 0.6 }
+            });
+            if (!ok || !data || data.error) throw new Error(data && data.error ? data.error.message : `HTTP error via ${via}`);
+            if (!data.candidates || !data.candidates[0]) throw new Error('Empty response from model.');
+            responseData = data;
+            responseData.via = via;
+            usedModel = currentModel;
+            break;
+          } catch (err) {
+            console.warn(`[${currentModel}] failed:`, err.message);
+            lastErrMsg = err.message;
+            if (i === models.length - 1) {
+              setStatus('Error', 'err');
+              setChip('error');
+              summary.innerHTML = `<p class="text-red-400 font-semibold">✖ All ${models.length} model(s) failed.<br><span class="text-red-300/80 text-[11px] break-all">Last error: ${esc(lastErrMsg)}</span><br><span class="text-slate-400 text-[11px]">Open the page via the bundled server (http://127.0.0.1:8731/aegis.html) — the local proxy avoids browser CORS blocks. If you still see "Failed to fetch" there, check that the server is running.</span></p>`;
+              document.getElementById('analyze-btn').disabled = false;
+              return;
+            }
+          }
+        }
+
+        // Collect ONLY answer text — skip Gemini 2.x thinking segments
+        const partsText = (content) => (content.parts || [])
+          .filter(p => !p.thought)
+          .map(p => p.text || '')
+          .join('\n');
+
+        const parse = async (content) => {
+          const rawText = partsText(content);
+          if (!rawText.trim()) throw new Error('model returned an empty reply.');
+          let obj;
+          try {
+            obj = extractJSON(rawText);
+          } catch (e) {
+            // Self-heal: ask once more for strict JSON
+            log(`Output not parseable — requesting a strict-JSON retry from ${usedModel}…`, '#fbbf24');
+            const retry = await geminiGenerate(usedModel, apiKey, {
+              contents: [{ parts: [{ text: `Your previous answer was not valid JSON. Reply with ONLY a single valid JSON object matching EXACTLY this schema: {"algorithm": string, "unit": string, "answer": string, "motionReason": string, "codeSnippet": string, "visualStyle": "maze|grid|spiral|wave|orbit|radial", "path3D": [{"x": number, "y": 0.6, "z": number}], "steps": [{"name": string, "detail": string}], "ghostPath3D": [{"x": number, "y": 0.6, "z": number}], "ghostAlgorithm": string, "ghostExplanation": string, "ghostNextStep": {"x": number, "z": number}}. Include ghost fields only if the query mentions Pac-Man/ghosts/chasing. Do not use markdown fences and do not add any extra text.` }] }],
+              generationConfig: { responseMimeType: 'application/json', temperature: 0.2 }
+            });
+            if (!retry.ok || !retry.data || retry.data.error) {
+              throw new Error(`strict-JSON retry failed via ${retry.via || '?'}: ${(retry.data && retry.data.error && retry.data.error.message) || 'HTTP error'}`);
+            }
+            obj = extractJSON(partsText(retry.data.candidates[0].content));
+            responseData.via = retry.via;
+          }
+          if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
+            throw new Error('model returned JSON that is not an object.');
+          }
+          return { obj, rawFallback: rawText };
+        };
+
+        let parsedRes;
+        try {
+          parsedRes = await parse(responseData.candidates[0].content);
+          payload = parsedRes.obj;
+          log(`Response (via ${responseData.via || 'unknown'}) received from ${usedModel}. Parsing spatial path…`, '#5eead4');
+        } catch (err) {
+          console.warn('Parse failed — using offline fallback:', err.message);
+          const debug = (parsedRes && parsedRes.rawFallback) ||
+            partsText((responseData.candidates[0] || {}).content || { parts: [] });
+          document.getElementById('code-view').innerHTML = highlight(debug.slice(0, 6000));
+          log(`Model reply wasn't usable JSON — generated the motion plan offline instead. (${esc(err.message)})`, '#fbbf24');
+          payload = fallbackPlan(queryText);
+          usedFallback = true;
+        }
+      }
+
+      try {
+        // Detect the 3D presentation style from the topic + model hint
+        const style = detectStyle(payload, queryText);
+        const styleInfo = STYLE_INFO[style] || STYLE_INFO.orbit;
+        const algoLabel = payload.algorithm || styleInfo.label;
+        const motionReason = payload.motionReason || styleInfo.reason;
+
+        // Render answer with typing effect (sanitized)
+        summary.innerHTML = `
+          ${usedFallback ? '<div class="mb-2 text-[10px] text-amber-300/90 border border-amber-500/30 bg-amber-950/40 rounded px-2 py-1">⚠ Offline fallback: the model reply was not usable JSON, so this motion plan was generated locally. Raw output is in the code panel.</div>' : ''}
+          <div class="mb-2 p-2 bg-blue-950/60 border border-blue-800/80 rounded-lg">
+            <span class="text-[10px] uppercase font-bold text-blue-400 block tracking-wider">Active Animation Algorithm</span>
+            <span class="text-xs font-semibold text-teal-300" id="ans-algo">${esc(algoLabel)}</span>
+            ${payload.unit ? `<span class="text-[9px] uppercase tracking-wider text-indigo-300/80 block mt-1">📚 ${esc(payload.unit)}</span>` : ''}
+            <span class="text-[9px] uppercase tracking-wider text-teal-500/80 block mt-1">3D style · ${esc(styleInfo.label)}</span>
+          </div>
+          <p id="ans-body" class="text-slate-200 text-xs leading-relaxed"></p>
+          <div class="border-l-2 border-teal-500/60 pl-2 text-[11px] text-slate-400 leading-relaxed mt-2">
+            <span class="font-bold text-teal-400 block mb-0.5">Why this motion path</span>
+            <span>${esc(motionReason)}</span>
+          </div>
+          <div class="mt-2 border border-slate-700/60 rounded-lg overflow-hidden">
+            <div class="bg-slate-800/70 px-2 py-1 text-[9px] uppercase tracking-widest text-slate-400 font-bold">Step-by-Step Execution</div>
+            <ol id="step-list" class="p-2 space-y-1.5"></ol>
+          </div>`;
+        typeInto(document.getElementById('ans-body'), payload.answer || 'No explanation returned.', 6);
+
+        // Step-by-step breakdown — synced with flight progress below
+        document.getElementById('step-line').textContent = '—';
+        const stepListEl = document.getElementById('step-list');
+        if (payload.steps && payload.steps.length) {
+          steps = payload.steps;
+          lastStep = -1;
+          stepItems = [];
+          stepListEl.innerHTML = steps.map((s, i) =>
+            `<li class="step-item"><span class="step-num">${i + 1}</span><div><span class="step-name">${esc(s.name || 'Step ' + (i + 1))}</span>${s.detail ? `<p class="step-detail">${esc(s.detail)}</p>` : ''}</div></li>`
+          ).join('');
+          stepItems = [...stepListEl.querySelectorAll('.step-item')];
+          log(`Step-by-step breakdown loaded — ${steps.length} phases.`, '#7dd3fc');
+        } else {
+          steps = []; stepItems = [];
+          stepListEl.innerHTML = '<li class="step-item"><span class="step-num">—</span><div><span class="step-name" style="color:#64748b;font-style:italic">No step breakdown returned by the model.</span></div></li>';
+        }
+
+        // Code view
+        const codeEl = document.getElementById('code-view');
+        codeEl.innerHTML = highlight(payload.codeSnippet || '// No algorithmic code provided.');
+        log(`Algorithm context bound to "${algoLabel}" — 3D style: ${style}.`, '#7dd3fc');
+        showBanner(algoLabel);
+        document.getElementById('stage-algo-text').textContent = `Algorithm: ${algoLabel} · ${styleInfo.label}`;
+        document.getElementById('stage-algo').classList.remove('opacity-0');
+        setStatus('Flying path…', 'busy');
+        setChip('navigating');
+
+        // Build spline from waypoints
+        const pts = payload.path3D;
+        if (pts && Array.isArray(pts) && pts.length > 1) {
+          const curvePoints = pts.map(p => new THREE.Vector3(
+            THREE.MathUtils.clamp(+p.x, -8, 8),
+            +p.y || 0.6,
+            THREE.MathUtils.clamp(+p.z, -8, 8)
+          ));
+          clearDecorations();
+          renderScene(style, curvePoints);
+          setupGhost(payload);          // Pac-Man/ghost chases get an extra pursuer
+          splineCurve = new THREE.CatmullRomCurve3(curvePoints, false, 'centripetal');
+          animationProgress = 0;
+          isFlying = true;
+          prevTangentValid = false;
+          buildPhaseRibbon(curvePoints, steps.length || curvePoints.length);
+          buildWaypointBeacons(curvePoints);
+          trail.length = 0;
+          eatenCount = 0;
+          pelletsDone = false;
+          document.getElementById('travel-pct').textContent = '0%';
+          log(`Spline built from ${curvePoints.length} waypoints — engaging ${style} flight.`, '#7dd3fc');
+        } else {
+          // single point — teleport + ripple
+          const px = pts && pts.length === 1 ? +pts[0].x : 0;
+          const pz = pts && pts.length === 1 ? +pts[0].z : 0;
+          clearDecorations();
+          renderScene(style, [new THREE.Vector3(px, 0.6, pz)]);
+          agentGroup.position.set(px, 0.6, pz);
+          spawnRipples(new THREE.Vector3(px, 0.06, pz));
+          setStatus('Target placed', 'ok');
+          setChip('placed');
+        }
+      } catch (err) {
+        console.error(err);
+        setStatus('Error', 'err');
+        setChip('error');
+        summary.innerHTML = `<p class="text-red-400 font-semibold">✖ ${esc(err.message)}</p>`;
+      } finally {
+        document.getElementById('analyze-btn').disabled = false;
+      }
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       4. SIMPLE SYNTAX HIGHLIGHTER
+    ══════════════════════════════════════════════════════════════════════ */
+    function highlight(code) {
+      let h = esc(code);
+      h = h.replace(/(["'`](?:\\.|[^"'`\\])*["'`])/g, '<span style="color:#4ade80">$1</span>');
+      h = h.replace(/(\/\/.*$)/gm, '<span style="color:#64748b">$1</span>');
+      h = h.replace(/\b(function|const|let|var|return|if|else|for|while|do|new|class|this|import|from|export|async|await|try|catch|throw|in|of|switch|case|break)\b/g, '<span style="color:#c084fc">$1</span>');
+      h = h.replace(/\b(\d+\.?\d*)\b/g, '<span style="color:#f59e0b">$1</span>');
+      h = h.replace(/\b(true|false|null|undefined|NaN)\b/g, '<span style="color:#f97316">$1</span>');
+      return h;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       5. EVENT LISTENERS
+    ══════════════════════════════════════════════════════════════════════ */
+    window.addEventListener('DOMContentLoaded', () => {
+      init3D();
+      log('3D renderer initialized — scene ready.', '#5eead4');
+
+      const queryInput = document.getElementById('query-input');
+      const analyzeBtn = document.getElementById('analyze-btn');
+
+      analyzeBtn.addEventListener('click', () => processQuery(queryInput.value, 'query'));
+      document.getElementById('demo-btn').addEventListener('click', () => processQuery('built-in demo', 'demo'));
+      document.getElementById('demo-btn-2').addEventListener('click', () => processQuery('built-in demo', 'demo'));
+
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const t = btn.dataset.preset;
+          queryInput.value = t;
+          processQuery(t, 'query');
+        });
+      });
+
+      queryInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') processQuery(queryInput.value, 'query');
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) processQuery('built-in demo', 'demo');
+      });
+
+      // Reset camera
+      document.getElementById('reset-cam').addEventListener('click', () => {
+        camera.position.set(10, 11, 15);
+        controls.target.set(0, 1, 0);
+        controls.update();
+        followMode = false;
+        document.getElementById('follow-cam').textContent = '🎥 Follow';
+        log('Camera view reset.', '#94a3b8');
+      });
+
+      // Toggle auto orbit
+      document.getElementById('toggle-cam').addEventListener('click', function () {
+        controls.autoRotate = !controls.autoRotate;
+        this.textContent = controls.autoRotate ? '⟳ Stop' : '⟳ Orbit';
+        log(`Auto-orbit ${controls.autoRotate ? 'enabled' : 'disabled'}.`, '#94a3b8');
+      });
+
+      // Cinematic chase camera — rides behind the agent during flight
+      document.getElementById('follow-cam').addEventListener('click', function () {
+        followMode = !followMode;
+        this.textContent = followMode ? '🎥 Following' : '🎥 Follow';
+        if (followMode) {
+          controls.autoRotate = false;
+          document.getElementById('toggle-cam').textContent = '⟳ Orbit';
+        }
+        log(`Chase camera ${followMode ? 'engaged — viewing the path from the agent point of view' : 'disengaged'}.`, '#a5b4fc');
+      });
+
+      // Flight speed multiplier
+      const speedSlider = document.getElementById('speed-slider');
+      const speedVal = document.getElementById('speed-val');
+      speedSlider.addEventListener('input', () => {
+        speedMul = parseFloat(speedSlider.value);
+        speedVal.textContent = speedMul.toFixed(1) + '×';
+      });
+
+      // Clear log
+      document.getElementById('clear-log').addEventListener('click', () => {
+        document.getElementById('code-view').innerHTML = '';
+        log('Log cleared.', '#64748b');
+      });
+
+      // Toggle API key visibility
+      document.getElementById('toggle-key').addEventListener('click', function () {
+        const input = document.getElementById('api-key-input');
+        input.type = input.type === 'password' ? 'text' : 'password';
+        this.textContent = input.type === 'password' ? 'show' : 'hide';
+      });
+
+      // Voice input
+      const micBtn = document.getElementById('mic-btn');
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRec) {
+        const rec = new SpeechRec();
+        rec.lang = 'en-US';
+        micBtn.addEventListener('click', () => {
+          micBtn.classList.replace('text-slate-400', 'text-red-400');
+          rec.start();
+        });
+        rec.onresult = (e) => {
+          const transcript = e.results[0][0].transcript;
+          queryInput.value = transcript;
+          micBtn.classList.replace('text-red-400', 'text-slate-400');
+          processQuery(transcript, 'query');
+        };
+        rec.onerror = () => micBtn.classList.replace('text-red-400', 'text-slate-400');
+        rec.onend = () => micBtn.classList.replace('text-red-400', 'text-slate-400');
+      } else {
+        micBtn.title = 'Voice input not supported in this browser';
+        micBtn.classList.add('opacity-40', 'cursor-not-allowed');
+      }
+
+      log('Voice input ' + (SpeechRec ? 'ready.' : 'not supported — mic disabled.'), SpeechRec ? '#5eead4' : '#fbbf24');
+    });
+  </script>
+</body>
+</html>
