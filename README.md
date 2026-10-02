@@ -93,3 +93,52 @@ AEGIS is tuned for a standard AI course syllabus:
 ---
 
 ## 📁 Project Structure
+├── aegis.html          # Single-file application (everything is self-contained)
+└── README.md
+
+The entire experience lives in one HTML file — no build step required.
+
+---
+
+## 🎮 Controls
+
+| Action              | How |
+|---------------------|-----|
+| Orbit camera        | Drag |
+| Zoom                | Scroll |
+| Reset view          | ⌂ Reset button |
+| Auto-rotate         | ⟳ Orbit button |
+| Chase camera        | 🎥 Follow button |
+| Change flight speed | ⏩ Slider |
+| Hover waypoint      | See why the agent chose that move |
+| Voice input         | 🎙 microphone button |
+
+---
+
+## 📝 Example Queries
+
+- “Pac-Man maze: a ghost chases Pac-Man and predicts its next move”
+- “Sudoku backtracking solver scanning the 9×9 grid”
+- “Explain A* search with an example path”
+- “How does Minimax with Alpha-Beta pruning work?”
+- “Spiral matrix traversal”
+- “BFS vs DFS — which is better for maze solving?”
+
+---
+
+## ⚠️ Notes
+
+- API key is stored only in the browser (it lives in the input field for the session only).
+- When opened as `file://`, the optional local proxy is unavailable — use the Live Demo or serve the page over HTTP.
+- The offline fallback guarantees a visualization even if the model returns unusable JSON.
+
+---
+
+## 📜 License
+
+MIT License — feel free to use, modify, and share.
+
+---
+
+**AEGIS v2.0** · Three.js r128 · Gemini API  
+*Drag to orbit · Scroll to zoom · Hover numbered waypoints for the “why” · 🎥 Follow-cam · ⏩ Speed*
